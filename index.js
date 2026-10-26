@@ -51,9 +51,7 @@ function savePortalData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-// --------------------------------------------------
-// KEEP-ALIVE PING ROUTE
-// --------------------------------------------------
+// Keep-alive ping endpoint
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
@@ -75,4 +73,44 @@ app.get('/app', (req, res) => {
 
 // 3. API Endpoints
 app.get('/api/portal', (req, res) => {
-  res.status(200).json({ success:
+  res.status(200).json({ success: true, ...getPortalData() });
+});
+
+app.post('/api/save', (req, res) => {
+  const { masterRedirect, links } = req.body;
+  const current = getPortalData();
+  const updated = {
+    masterRedirect: masterRedirect || current.masterRedirect,
+    links: Array.isArray(links) ? links : current.links
+  };
+  savePortalData(updated);
+  return res.status(200).json({ success: true, data: updated });
+});
+
+app.all('/api/set-redirect', (req, res) => {
+  const newUrl = req.body?.url || req.query?.url;
+  if (!newUrl) return res.status(400).json({ success: false, error: 'Missing url' });
+  const data = getPortalData();
+  data.masterRedirect = newUrl;
+  savePortalData(data);
+  return res.status(200).json({ success: true, masterRedirect: data.masterRedirect });
+});
+
+app.all('/api/update-link', (req, res) => {
+  const id = req.body?.id || req.query?.id;
+  const newTitle = req.body?.title || req.query?.title;
+  const newUrl = req.body?.url || req.query?.url;
+  if (!id) return res.status(400).json({ success: false, error: 'Missing id' });
+
+  const data = getPortalData();
+  const target = (data.links || []).find(item => item.id === String(id));
+  if (!target) return res.status(404).json({ success: false, error: 'Link not found' });
+
+  if (newTitle) target.title = newTitle;
+  if (newUrl) target.url = newUrl;
+  savePortalData(data);
+  return res.status(200).json({ success: true, updated: target });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log('Portal running on port ' + PORT));

@@ -21,12 +21,9 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 
 const defaultData = {
   masterRedirect: 'https://gooqlc.com/111z',
-  dividerTitle: 'CUSTOM LINKS',
-  top: [
+  links: [
     { id: '1', title: 'Google', url: 'https://google.com' },
-    { id: '2', title: 'Predict and Peek', url: 'https://www.icloud.com/shortcuts/' }
-  ],
-  custom: [
+    { id: '2', title: 'Predict and Peek', url: 'https://www.icloud.com/shortcuts/' },
     { id: '3', title: 'Inject', url: 'https://example.com' },
     { id: '4', title: 'Contact Peek', url: 'https://example.com' }
   ]
@@ -38,7 +35,16 @@ function getPortalData() {
     return defaultData;
   }
   try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    const raw = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    // Migration: merge top & custom if legacy format exists
+    if (!raw.links && (raw.top || raw.custom)) {
+      raw.links = [...(raw.top || []), ...(raw.custom || [])];
+      delete raw.top;
+      delete raw.custom;
+      delete raw.dividerTitle;
+      fs.writeFileSync(DATA_FILE, JSON.stringify(raw, null, 2));
+    }
+    return raw;
   } catch (err) {
     return defaultData;
   }
@@ -48,105 +54,198 @@ function savePortalData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-// 1. Spectator Route (Serves index.html from root)
+// 1. Spectator Route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// 2. Admin Dashboard (Inlined directly so no extra file is needed)
-app.get('/admin', (req, res) => {
+// 2. Standalone Controller Web App (Mobile Optimized)
+app.get('/app', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Portal Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Portal Admin" />
+  <title>Portal Control</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #121212; color: #e0e0e0; font-family: -apple-system, sans-serif; padding: 24px 16px; max-width: 600px; margin: 0 auto; }
-    h2 { margin-bottom: 20px; font-size: 20px; color: #fff; }
-    h3 { margin: 18px 0 10px; font-size: 14px; text-transform: uppercase; color: #888; }
-    label { font-size: 12px; color: #aaa; display: block; margin-bottom: 4px; }
-    input { width: 100%; background: #1e1e1e; border: 1px solid #333; border-radius: 8px; color: #fff; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; }
-    .link-row { background: #181818; border: 1px solid #282828; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
-    button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 600; font-size: 13px; }
-    .btn-add { background: #242424; color: #fff; border: 1px solid #3a3a3a; width: 100%; margin-bottom: 16px; }
-    .btn-delete { background: #3a1515; color: #ff6b6b; padding: 6px 12px; font-size: 11px; float: right; }
-    .btn-save { background: #0070f3; color: #fff; width: 100%; padding: 14px; font-size: 16px; margin-top: 24px; position: sticky; bottom: 16px; }
-    #status { text-align: center; font-size: 13px; margin-top: 10px; height: 18px; color: #4ade80; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      background-color: #000000;
+      color: #f2f2f7;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      padding: env(safe-area-inset-top, 24px) 16px env(safe-area-inset-bottom, 32px);
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 0 20px;
+    }
+    h1 { font-size: 24px; font-weight: 700; }
+    .status-badge {
+      font-size: 11px;
+      background: #1c1c1e;
+      padding: 6px 12px;
+      border-radius: 20px;
+      color: #30d158;
+      font-weight: 600;
+    }
+    .section-label {
+      font-size: 13px;
+      color: #8e8e93;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 18px 0 8px 4px;
+      font-weight: 600;
+    }
+    .card {
+      background-color: #1c1c1e;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    label {
+      font-size: 12px;
+      color: #8e8e93;
+      display: block;
+      margin-bottom: 4px;
+    }
+    input {
+      width: 100%;
+      background: #2c2c2e;
+      border: 1px solid #3a3a3c;
+      border-radius: 8px;
+      color: #ffffff;
+      padding: 12px;
+      font-size: 15px;
+      margin-bottom: 12px;
+      outline: none;
+    }
+    input:focus { border-color: #0a84ff; }
+    .btn-delete {
+      background: #3a1515;
+      color: #ff453a;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      float: right;
+      cursor: pointer;
+    }
+    .btn-add {
+      width: 100%;
+      background: #1c1c1e;
+      color: #0a84ff;
+      border: 1px dashed #3a3a3c;
+      border-radius: 14px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .btn-save {
+      position: sticky;
+      bottom: calc(env(safe-area-inset-bottom, 16px) + 12px);
+      width: 100%;
+      background: #0a84ff;
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 24px;
+      box-shadow: 0 4px 20px rgba(10, 132, 255, 0.4);
+    }
+    .btn-save:active { background: #0071e3; }
   </style>
 </head>
 <body>
-  <h2>Portal Link Manager</h2>
-  <label>Screen Tap / Click-off Redirect URL</label>
-  <input type="text" id="masterRedirect" />
-  <label>Divider Title</label>
-  <input type="text" id="dividerTitle" />
-  <h3>Top Section Links</h3>
-  <div id="topList"></div>
-  <button class="btn-add" onclick="addLink('top')">+ Add Top Link</button>
-  <h3>Custom Section Links</h3>
-  <div id="customList"></div>
-  <button class="btn-add" onclick="addLink('custom')">+ Add Custom Link</button>
-  <button class="btn-save" onclick="saveData()">Save All Changes</button>
-  <div id="status"></div>
+
+  <header>
+    <h1>Portal App</h1>
+    <div class="status-badge" id="statusBadge">Live</div>
+  </header>
+
+  <div class="section-label">Master Decoy Redirect</div>
+  <div class="card">
+    <label>URL when spectator clicks off or taps back</label>
+    <input type="text" id="masterRedirect" />
+  </div>
+
+  <div class="section-label">Active Portal Buttons</div>
+  <div id="linksList"></div>
+
+  <button class="btn-add" onclick="addLink()">+ Add New Button</button>
+  <button class="btn-save" onclick="saveData()">Save All Updates</button>
+
   <script>
-    let currentData = { top: [], custom: [] };
+    let links = [];
+
     async function loadData() {
       const res = await fetch('/api/portal');
       const data = await res.json();
-      currentData = data;
       document.getElementById('masterRedirect').value = data.masterRedirect || '';
-      document.getElementById('dividerTitle').value = data.dividerTitle || '';
-      renderList('topList', data.top, 'top');
-      renderList('customList', data.custom, 'custom');
+      links = data.links || [];
+      render();
     }
-    function renderList(containerId, items, section) {
-      const container = document.getElementById(containerId);
+
+    function render() {
+      const container = document.getElementById('linksList');
       container.innerHTML = '';
-      (items || []).forEach((item, index) => {
+      links.forEach((item, index) => {
         const div = document.createElement('div');
-        div.className = 'link-row';
+        div.className = 'card';
         div.innerHTML = \`
-          <button class="btn-delete" onclick="removeLink('\${section}', \${index})">Delete</button>
-          <div style="font-size:11px; color:#666; margin-bottom:6px;">ID: \${item.id}</div>
-          <label>Button Name</label>
-          <input type="text" value="\${item.title}" oninput="updateItem('\${section}', \${index}, 'title', this.value)" />
+          <button class="btn-delete" onclick="removeLink(\${index})">Delete</button>
+          <div style="font-size:11px; color:#636366; margin-bottom:6px;">BUTTON #\${index + 1}</div>
+          <label>Title</label>
+          <input type="text" value="\${item.title}" oninput="links[\${index}].title = this.value" />
           <label>Target URL</label>
-          <input type="text" value="\${item.url}" oninput="updateItem('\${section}', \${index}, 'url', this.value)" />
+          <input type="text" value="\${item.url}" oninput="links[\${index}].url = this.value" />
         \`;
         container.appendChild(div);
       });
     }
-    function updateItem(section, index, key, value) { currentData[section][index][key] = value; }
-    function removeLink(section, index) {
-      currentData[section].splice(index, 1);
-      renderList(section === 'top' ? 'topList' : 'customList', currentData[section], section);
+
+    function addLink() {
+      links.push({ id: String(Date.now()).slice(-4), title: 'New Link', url: 'https://' });
+      render();
     }
-    function addLink(section) {
-      const newId = String(Date.now()).slice(-4);
-      currentData[section].push({ id: newId, title: 'New Link', url: 'https://' });
-      renderList(section === 'top' ? 'topList' : 'customList', currentData[section], section);
+
+    function removeLink(index) {
+      links.splice(index, 1);
+      render();
     }
+
     async function saveData() {
       const payload = {
         masterRedirect: document.getElementById('masterRedirect').value.trim(),
-        dividerTitle: document.getElementById('dividerTitle').value.trim(),
-        top: currentData.top,
-        custom: currentData.custom
+        links: links
       };
+
       const res = await fetch('/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const result = await res.json();
-      const status = document.getElementById('status');
-      if (result.success) {
-        status.textContent = 'Saved successfully!';
-        setTimeout(() => { status.textContent = ''; }, 2500);
+
+      const badge = document.getElementById('statusBadge');
+      if (res.ok) {
+        badge.textContent = 'Saved!';
+        badge.style.color = '#30d158';
+        setTimeout(() => { badge.textContent = 'Live'; }, 2000);
       }
     }
+
     loadData();
   </script>
 </body>
@@ -159,13 +258,11 @@ app.get('/api/portal', (req, res) => {
 });
 
 app.post('/api/save', (req, res) => {
-  const { masterRedirect, dividerTitle, top, custom } = req.body;
+  const { masterRedirect, links } = req.body;
   const current = getPortalData();
   const updated = {
     masterRedirect: masterRedirect || current.masterRedirect,
-    dividerTitle: dividerTitle !== undefined ? dividerTitle : current.dividerTitle,
-    top: Array.isArray(top) ? top : current.top,
-    custom: Array.isArray(custom) ? custom : current.custom
+    links: Array.isArray(links) ? links : current.links
   };
   savePortalData(updated);
   return res.status(200).json({ success: true, data: updated });
@@ -187,7 +284,7 @@ app.all('/api/update-link', (req, res) => {
   if (!id) return res.status(400).json({ success: false, error: 'Missing id' });
 
   const data = getPortalData();
-  const target = [...data.top, ...data.custom].find(item => item.id === String(id));
+  const target = (data.links || []).find(item => item.id === String(id));
   if (!target) return res.status(404).json({ success: false, error: 'Not found' });
 
   if (newTitle) target.title = newTitle;
@@ -200,8 +297,7 @@ app.all('/api/delete-link', (req, res) => {
   const id = req.body?.id || req.query?.id;
   if (!id) return res.status(400).json({ success: false, error: 'Missing id' });
   const data = getPortalData();
-  data.top = data.top.filter(item => item.id !== String(id));
-  data.custom = data.custom.filter(item => item.id !== String(id));
+  data.links = (data.links || []).filter(item => item.id !== String(id));
   savePortalData(data);
   return res.status(200).json({ success: true, message: `Deleted ${id}` });
 });

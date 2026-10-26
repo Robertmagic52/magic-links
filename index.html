@@ -94,7 +94,7 @@
       history.pushState(null, document.title, location.href);
     });
 
-    let currentRedirect = 'https://gooqlc.com/111z';
+    let currentRedirect = 'https://www.apple.com';
 
     // 2. Build tiles dynamically
     function renderPortal(data) {
@@ -105,4 +105,57 @@
         data.top.forEach(item => container.appendChild(createTile(item)));
       }
 
-      if (data.divider
+      if (data.dividerTitle) {
+        const divider = document.createElement('div');
+        divider.className = 'divider';
+        divider.innerHTML = `<span>${data.dividerTitle}</span>`;
+        container.appendChild(divider);
+      }
+
+      if (Array.isArray(data.custom)) {
+        data.custom.forEach(item => container.appendChild(createTile(item)));
+      }
+    }
+
+    function createTile(item) {
+      const tile = document.createElement('a');
+      tile.className = 'menu-tile';
+      tile.href = '#';
+      tile.textContent = item.title;
+
+      tile.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Overwrite history so clicking Back on the destination skips this page
+        window.location.replace(item.url);
+      });
+
+      return tile;
+    }
+
+    // 3. Fetch link configuration
+    async function fetchConfig() {
+      try {
+        const res = await fetch('/api/portal');
+        const data = await res.json();
+        if (data.success) {
+          if (data.masterRedirect) currentRedirect = data.masterRedirect;
+          renderPortal(data);
+        }
+      } catch (err) {
+        console.warn('Backend unavailable');
+      }
+    }
+
+    // 4. Tap anywhere on the background to trigger the master redirect
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.menu-tile')) {
+        window.location.replace(currentRedirect);
+      }
+    });
+
+    fetchConfig();
+  </script>
+
+</body>
+</html>

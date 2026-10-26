@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title></title>
 
-  <!-- iOS Safari Native Smart App Banner for Shortcuts -->
+  <!-- iOS Safari Smart App Banner for Shortcuts -->
   <meta name="apple-itunes-app" content="app-id=915254993" />
 
   <style>
@@ -58,29 +58,6 @@
       background-color: #242424;
       transform: scale(0.99);
     }
-
-    .divider {
-      display: flex;
-      align-items: center;
-      margin: 18px 0;
-      color: #4b4b4b;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-    }
-
-    .divider::before,
-    .divider::after {
-      content: "";
-      flex: 1;
-      height: 1px;
-      background-color: #222222;
-    }
-
-    .divider span {
-      padding: 0 16px;
-    }
   </style>
 </head>
 <body>
@@ -88,47 +65,50 @@
   <div class="menu-container" id="menuContainer"></div>
 
   <script>
-    // 1. Back-Button Trap
-    history.pushState(null, document.title, location.href);
-    window.addEventListener('popstate', function () {
-      history.pushState(null, document.title, location.href);
-    });
-
     let currentRedirect = 'https://gooqlc.com/111z';
 
-    function renderPortal(data) {
+    // --- HARDENED BACK-BUTTON LOCK ---
+
+    // 1. Flood the history stack so single back taps don't reach previous sites
+    for (let i = 0; i < 15; i++) {
+      history.pushState({ page: i }, document.title, location.href);
+    }
+
+    // 2. If back arrow is pressed while on the page, force exit to the decoy
+    window.addEventListener('popstate', function () {
+      window.location.replace(currentRedirect);
+    });
+
+    // 3. Safari bfcache kill-switch: if the spectator hits "Back" on an external site
+    // and returns to this portal, instantly bounce them to the redirect
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted || (window.performance && window.performance.getEntriesByType('navigation')[0]?.type === 'back_forward')) {
+        window.location.replace(currentRedirect);
+      }
+    });
+
+    // --- PORTAL RENDERING ---
+
+    function renderPortal(links) {
       const container = document.getElementById('menuContainer');
       container.innerHTML = '';
 
-      if (Array.isArray(data.top)) {
-        data.top.forEach(item => container.appendChild(createTile(item)));
+      if (Array.isArray(links)) {
+        links.forEach(item => {
+          const tile = document.createElement('a');
+          tile.className = 'menu-tile';
+          tile.href = '#';
+          tile.textContent = item.title;
+
+          tile.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.replace(item.url);
+          });
+
+          container.appendChild(tile);
+        });
       }
-
-      if (data.dividerTitle) {
-        const divider = document.createElement('div');
-        divider.className = 'divider';
-        divider.innerHTML = `<span>${data.dividerTitle}</span>`;
-        container.appendChild(divider);
-      }
-
-      if (Array.isArray(data.custom)) {
-        data.custom.forEach(item => container.appendChild(createTile(item)));
-      }
-    }
-
-    function createTile(item) {
-      const tile = document.createElement('a');
-      tile.className = 'menu-tile';
-      tile.href = '#';
-      tile.textContent = item.title;
-
-      tile.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.location.replace(item.url);
-      });
-
-      return tile;
     }
 
     async function fetchConfig() {
@@ -137,26 +117,26 @@
         const data = await res.json();
         if (data.success) {
           if (data.masterRedirect) currentRedirect = data.masterRedirect;
-          renderPortal(data);
+          renderPortal(data.links || []);
         }
       } catch (err) {
         console.warn('Backend unavailable');
       }
     }
 
-    // Trigger 1: Clicking empty space on screen
+    // Trigger 1: Clicking empty background
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.menu-tile')) {
         window.location.replace(currentRedirect);
       }
     });
 
-    // Trigger 2: Tapping URL bar, switching tabs, or clicking out of window
+    // Trigger 2: Clicking URL bar, switching tabs, leaving window
     window.addEventListener('blur', () => {
       window.location.replace(currentRedirect);
     });
 
-    // Trigger 3: Minimizing Safari, locking phone, switching apps
+    // Trigger 3: Minimizing Safari, locking phone
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
         window.location.replace(currentRedirect);
